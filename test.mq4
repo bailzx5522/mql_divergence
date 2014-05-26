@@ -17,6 +17,7 @@ input double TakeProfit    = 200;
 input double StopLose    = 120;
 input double Lots          = 0.1;
 input double TrailingStop  = 10;
+input bool ShowMarketInfo = false;
 //
 extern string separator1="*** MACD Settings ***";
 extern int    fastEMA = 1;
@@ -33,12 +34,85 @@ double signal[];
 int DivergenceDecision = 0;
 int RSIDecision = 0;
 int AverageRangeDecision = 0;
+int lower_period = 0 ;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
 {
+    GetLowerPeriod();
+    GetMarketInfo();
     return(INIT_SUCCEEDED);
+}
+
+int GetMarketInfo()
+{
+/**
+    ModeLow = MarketInfo(Symbol(), MODE_LOW);
+    ModeHigh = MarketInfo(Symbol(), MODE_HIGH);
+    ModeTime = MarketInfo(Symbol(), MODE_TIME);
+    ModeBid = MarketInfo(Symbol(), MODE_BID);
+    ModeAsk = MarketInfo(Symbol(), MODE_ASK);
+    ModePoint = MarketInfo(Symbol(), MODE_POINT);
+    ModeDigits = MarketInfo(Symbol(), MODE_DIGITS);
+    ModeSpread = MarketInfo(Symbol(), MODE_SPREAD);
+    ModeStopLevel = MarketInfo(Symbol(), MODE_STOPLEVEL);
+    ModeLotSize = MarketInfo(Symbol(), MODE_LOTSIZE);
+    ModeTickValue = MarketInfo(Symbol(), MODE_TICKVALUE);
+    ModeTickSize = MarketInfo(Symbol(), MODE_TICKSIZE);
+    ModeSwapLong = MarketInfo(Symbol(), MODE_SWAPLONG);
+    ModeSwapShort = MarketInfo(Symbol(), MODE_SWAPSHORT);
+    ModeStarting = MarketInfo(Symbol(), MODE_STARTING);
+    ModeExpiration = MarketInfo(Symbol(), MODE_EXPIRATION);
+    ModeTradeAllowed = MarketInfo(Symbol(), MODE_TRADEALLOWED);
+    ModeMinLot = MarketInfo(Symbol(), MODE_MINLOT);
+    ModeLotStep = MarketInfo(Symbol(), MODE_LOTSTEP);
+    // It is concluded information about the market
+    if ( ShowMarketInfo == True )
+    {
+        Print("ModeLow:",ModeLow);
+        Print("ModeHigh:",ModeHigh);
+        Print("ModeTime:",ModeTime);
+        Print("ModeBid:",ModeBid);
+        Print("ModeAsk:",ModeAsk);
+        Print("ModePoint:",ModePoint);
+        Print("ModeDigits:",ModeDigits);
+        Print("ModeSpread:",ModeSpread);
+        Print("ModeStopLevel:",ModeStopLevel);
+        Print("ModeLotSize:",ModeLotSize);
+        Print("ModeTickValue:",ModeTickValue);
+        Print("ModeTickSize:",ModeTickSize);
+        Print("ModeSwapLong:",ModeSwapLong);
+        Print("ModeSwapShort:",ModeSwapShort);
+        Print("ModeStarting:",ModeStarting);
+        Print("ModeExpiration:",ModeExpiration);
+        Print("ModeTradeAllowed:",ModeTradeAllowed);
+        Print("ModeMinLot:",ModeMinLot);
+        Print("ModeLotStep:",ModeLotStep);
+    }
+**/
+    return (0);
+}
+
+void GetLowerPeriod()
+{
+    switch(Period())
+    {
+        case 30:
+            lower_period = 15;
+            break;
+        case 15:
+            lower_period = 5;
+            break;
+        case 60:
+            lower_period = 15;
+            break;
+        case 240:
+            lower_period = 60;
+            break;
+        default:
+            lower_period = 5;
+    }
 }
 //+------------------------------------------------------------------+
 //| Expert deinitialization function                                 |
@@ -46,16 +120,16 @@ int OnInit()
 void OnDeinit(const int reason)
 {
 //---
- 
 }
 //+------------------------------------------------------------------+.
 //| Expert tick function                                             |
 //+------------------------------------------------------------------+
 void OnTick()
 {
-//---
+    //***************************Close or Modify Orders
     ReviewOrder();
 
+    //***************************Make choice
     if(Volume[0]>1){return;}
     DivergenceDecision = 0;
     RSIDecision = 0;
@@ -63,17 +137,17 @@ void OnTick()
     CalculateDivergence();
     CalculateRSI();
     AverageRange();
+    //***************************OpenOrder
     ComeonMoney();
 }
 
-//**************************Review opened orders for SL or TP
+//*******************************Review opened orders for SL or TP
 void ReviewOrder()
 {
-    if(iVolume(Symbol(), PERIOD_M5, 0)>1)   return;
     for(int i=0; i<OrdersTotal(); i++)
     {
-        ModifySlTp(i);
-        CheckRSIForClose(i);
+        //ModifySlTp(i);
+        //CheckRSIForClose(i);
     }
     return;
 }
@@ -102,10 +176,13 @@ void ModifySlTp(int order)
         }
     }
 }
-
-//**************************Use RSI Divergence for close order*********************//
+//+------------------------------------------------------------------+.
+//|Use RSI Divergence for close order                                |
+//|Find a reverse according RSI divergence                           |
+//+------------------------------------------------------------------+
 void CheckRSIForClose(int order)
 {
+    if(iVolume(Symbol(), lower_period, 0)>1)   return;
     if(OrderSelect(order, SELECT_BY_POS, MODE_TRADES))
     {
         int bar = iBarShift(Symbol(), PERIOD_M5, OrderOpenTime());
@@ -113,24 +190,7 @@ void CheckRSIForClose(int order)
         int low = bar;
         int ticket = OrderTicket();
         int ret;
-        int lower_period;
-        switch(Period())
-        {
-            case 30:
-                lower_period = 15;
-                break;
-            case 15:
-                lower_period = 5;
-                break;
-            case 60:
-                lower_period = 15;
-                break;
-            case 240:
-                lower_period = 60;
-                break;
-            default:
-                lower_period = 5;
-        }
+
         for(int i=bar-1; i>0; i--)
         {
             if(OrderType()==OP_BUY && iHigh(Symbol(), lower_period, i)>iHigh(Symbol(), lower_period, high))
@@ -157,6 +217,9 @@ void CheckRSIForClose(int order)
     }
 }
 
+//+------------------------------------------------------------------+.
+//|Calculate RSI for open order.                                     |
+//+------------------------------------------------------------------+
 void CalculateRSI()
 {
     double rsi = iRSI(Symbol(), 0, periodRSI, PRICE_CLOSE, 1);
@@ -201,7 +264,7 @@ void CatchBullishDivergence(int shift)
       return;
    int currentTrough=shift;
    int lastTrough=GetIndicatorLastTrough(shift);
-   //************************************regular bullish divergence
+   //*******************************regular bullish divergence
    if((lastTrough>=0 && lastTrough<Bars) && macd[currentTrough]>macd[lastTrough] && Low[currentTrough]<Low[lastTrough])
      {
         if(currentTrough == 2)
@@ -211,7 +274,7 @@ void CatchBullishDivergence(int shift)
             return;
         }
      }
-   // ******************************    hiden bearish devergence
+   //*******************************    hiden bearish devergence
    if((lastTrough>=0 && lastTrough<Bars) && macd[currentTrough]<macd[lastTrough] && Low[currentTrough]>Low[lastTrough])
      {
         if(currentTrough == 2)
