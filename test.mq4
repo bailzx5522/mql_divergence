@@ -26,8 +26,8 @@ extern int    signalSMA=1;
 extern int    periodRSI = 5;
 //calc average nge for 7 barsr
 extern int    ar = 7;
-//5pips
-extern int    arv = 50;
+//4pips
+extern int    arv = 40;
 //---- buffers
 double macd[];
 double signal[];
@@ -149,13 +149,9 @@ void OnTick()
 void ReviewOrder()
 {
     for(int i=0; i<OrdersTotal(); i++)
-    {
-        //Print(OrderSymbol(),"------------------------",OrderMagicNumber());
-        if(OrderSymbol() == Symbol() && OrderMagicNumber() == MagicNum)
-        {
-            KeyOfWin(i);
-            //CheckRSIForClose(i);
-        }
+    {   
+        KeyOfWin(i);
+        //CheckRSIForClose(i);
     }
     return;
 }
@@ -164,19 +160,21 @@ void KeyOfWin(int order)
 {
     if(OrderSelect(order, SELECT_BY_POS, MODE_TRADES))
     {
+        if(OrderSymbol() != Symbol() || OrderMagicNumber() != MagicNum) return;
         int ticket = OrderTicket();
         bool ret;
         if(OrderType() == OP_BUY)
         {
-            if(OrderTakeProfit()>2*AvgRange && OrderOpenPrice()-OrderStopLoss()>0)
+            if(Bid-OrderOpenPrice()>3*AvgRange && OrderOpenPrice()-OrderStopLoss()>0)
             {
+                Print(OrderOpenPrice(),"----------------------",OrderStopLoss());
                 ret = OrderClose(ticket, 0.5*Lots, Bid, 1, Blue);
                 ret = OrderModify(ticket, OrderOpenPrice(), OrderOpenPrice()+ModeSpread, NormalizeDouble(Bid+200*Point, Digits), 0, Blue);
             }
         }
         if(OrderType() == OP_SELL)
         {
-            if(OrderTakeProfit()>2*AvgRange && OrderOpenPrice()-OrderStopLoss()<0)
+            if(OrderOpenPrice()-Ask>2*AvgRange && OrderOpenPrice()-OrderStopLoss()<0)
             {
                 ret = OrderClose(ticket, 0.5*Lots, Ask, 1, Blue);
                 ret = OrderModify(ticket, OrderOpenPrice(), OrderOpenPrice()-ModeSpread, NormalizeDouble(Ask-200*Point,Digits), 0, Blue);
@@ -403,6 +401,7 @@ void ComeonMoney()
     if(DivergenceDecision==ENTRY_BUY && RSIDecision==ENTRY_BUY && AverageRangeDecision==1)
     {
         ticket = OrderSend(Symbol(), OP_BUY, Lots, Ask, 1, Bid-StopLose*Point, Bid+TakeProfit*Point, "test_buy", MagicNum, 0, Green);
+        if(ticket<0){    ProcessError(GetLastError());}
         DivergenceDecision = 0;
         RSIDecision = 0;
         AverageRangeDecision = 0;
@@ -411,19 +410,23 @@ void ComeonMoney()
     if(DivergenceDecision==ENTRY_SELL && RSIDecision==ENTRY_SELL && AverageRangeDecision==1)
     {
         ticket = OrderSend(Symbol(), OP_SELL, Lots, Bid, 1, Ask+StopLose*Point, Ask-TakeProfit*Point, "test_sell", MagicNum, 0, Green);
+        if(ticket<0){    ProcessError(GetLastError());}
         DivergenceDecision = 0;
         RSIDecision = 0;
         AverageRangeDecision = 0;
         return;
     }
 }
-/**
+
 void ProcessError(int errno)
 {
-    if(OrderSelect(ticket, SELECT_BY_POS) == false)
+    switch(errno)
     {
-            Print("----------------------", GetLastError());
-            Print("----------------------", Lots);
+        case 130:
+            Print("ERROR NUMBER is ------------------------",errno);
+            break;
+        default:
+            Print("ERROR NUMBER is ------------------------",errno);
+            return;
     }
 }
-**/
