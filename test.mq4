@@ -13,11 +13,11 @@
 #define ENTRY_WAIT_SELL -1
 #define ENTRY_SELL      -2
 // INPUT values
-input double TakeProfit    = 200;
-input double StopLose    = 120;
-input double Lots          = 0.1;
-input double TrailingStop  = 10;
-input bool ShowMarketInfo = false;
+extern  double TakeProfit    = 200;
+extern  double StopLose    = 120;
+extern  double Lots          = 0.1;
+extern  double TrailingStop  = 10;
+extern  bool ShowMarketInfo = false;
 //
 extern string separator1="*** MACD Settings ***";
 extern int    fastEMA = 1;
@@ -31,10 +31,13 @@ extern int    arv = 50;
 //---- buffers
 double macd[];
 double signal[];
+double AvgRange;
+double ModeSpread;
 int DivergenceDecision = 0;
 int RSIDecision = 0;
 int AverageRangeDecision = 0;
 int lower_period = 0 ;
+int MagicNum = 250250;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -91,6 +94,7 @@ int GetMarketInfo()
         Print("ModeLotStep:",ModeLotStep);
     }
 **/
+    ModeSpread = MarketInfo(Symbol(), MODE_SPREAD);
     return (0);
 }
 
@@ -146,13 +150,17 @@ void ReviewOrder()
 {
     for(int i=0; i<OrdersTotal(); i++)
     {
-        //ModifySlTp(i);
-        //CheckRSIForClose(i);
+        //Print(OrderSymbol(),"------------------------",OrderMagicNumber());
+        if(OrderSymbol() == Symbol() && OrderMagicNumber() == MagicNum)
+        {
+            KeyOfWin(i);
+            //CheckRSIForClose(i);
+        }
     }
     return;
 }
 
-void ModifySlTp(int order)
+void KeyOfWin(int order)
 {
     if(OrderSelect(order, SELECT_BY_POS, MODE_TRADES))
     {
@@ -160,18 +168,18 @@ void ModifySlTp(int order)
         bool ret;
         if(OrderType() == OP_BUY)
         {
-            if(OrderProfit()>100*Point && OrderStopLoss()<OrderOpenPrice())
+            if(OrderTakeProfit()>2*AvgRange && OrderOpenPrice()-OrderStopLoss()>0)
             {
                 ret = OrderClose(ticket, 0.5*Lots, Bid, 1, Blue);
-                ret = OrderModify(ticket, OrderOpenPrice(), OrderOpenPrice(), NormalizeDouble(Bid+200*Point, Digits), 0, Blue); 
+                ret = OrderModify(ticket, OrderOpenPrice(), OrderOpenPrice()+ModeSpread, NormalizeDouble(Bid+200*Point, Digits), 0, Blue);
             }
         }
         if(OrderType() == OP_SELL)
         {
-            if(OrderProfit()>100*Point && OrderStopLoss()>OrderOpenPrice())
+            if(OrderTakeProfit()>2*AvgRange && OrderOpenPrice()-OrderStopLoss()<0)
             {
                 ret = OrderClose(ticket, 0.5*Lots, Ask, 1, Blue);
-                ret = OrderModify(ticket, OrderOpenPrice(), OrderOpenPrice(), NormalizeDouble(Ask-200*Point,Digits), 0, Blue);
+                ret = OrderModify(ticket, OrderOpenPrice(), OrderOpenPrice()-ModeSpread, NormalizeDouble(Ask-200*Point,Digits), 0, Blue);
             }
         }
     }
@@ -372,15 +380,18 @@ int GetIndicatorLastTrough(int shift)
      }
    return(-1);
 }
-
+//+------------------------------------------------------------------+
+//|    Get AverageRange and AverageRangeDecision                     |
+//+------------------------------------------------------------------+
 void AverageRange()
 {
     double sum=0;
     for(int i=1; i<ar+1; i++)
     {
-        sum += (High[i]-Low[i]);
+        sum = sum + MathAbs(High[i]-Low[i]);
     }
-    if(sum/ar > arv*Point)
+    AvgRange = sum/ar;
+    if(AvgRange > arv*Point)
     {
         AverageRangeDecision = 1;
     }
@@ -388,10 +399,10 @@ void AverageRange()
 
 void ComeonMoney()
 {
-    int ticket = -1;
+    int ticket;
     if(DivergenceDecision==ENTRY_BUY && RSIDecision==ENTRY_BUY && AverageRangeDecision==1)
     {
-        ticket = OrderSend(Symbol(), OP_BUY, Lots, Ask, 1, Bid-StopLose*Point, Bid+TakeProfit*Point, "test_buy", 16384,0, Green);
+        ticket = OrderSend(Symbol(), OP_BUY, Lots, Ask, 1, Bid-StopLose*Point, Bid+TakeProfit*Point, "test_buy", MagicNum, 0, Green);
         DivergenceDecision = 0;
         RSIDecision = 0;
         AverageRangeDecision = 0;
@@ -399,10 +410,20 @@ void ComeonMoney()
     }
     if(DivergenceDecision==ENTRY_SELL && RSIDecision==ENTRY_SELL && AverageRangeDecision==1)
     {
-        ticket = OrderSend(Symbol(), OP_SELL, Lots, Bid, 1, Ask+StopLose*Point, Ask-TakeProfit*Point, "test_sell", 16384, 0, Green);
+        ticket = OrderSend(Symbol(), OP_SELL, Lots, Bid, 1, Ask+StopLose*Point, Ask-TakeProfit*Point, "test_sell", MagicNum, 0, Green);
         DivergenceDecision = 0;
         RSIDecision = 0;
         AverageRangeDecision = 0;
         return;
     }
 }
+/**
+void ProcessError(int errno)
+{
+    if(OrderSelect(ticket, SELECT_BY_POS) == false)
+    {
+            Print("----------------------", GetLastError());
+            Print("----------------------", Lots);
+    }
+}
+**/
