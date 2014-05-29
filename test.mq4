@@ -150,7 +150,7 @@ void ReviewOrder()
 {
     for(int i=0; i<OrdersTotal(); i++)
     {   
-        KeyOfWin(i);
+        //KeyOfWin(i);
         //CheckRSIForClose(i);
     }
     return;
@@ -398,9 +398,12 @@ void AverageRange()
 void ComeonMoney()
 {
     int ticket;
+    double sl = AvgRange*1.5;
+    double tp = AvgRange*3;
+    if(sl>150*Point) sl=150*Point;
     if(DivergenceDecision==ENTRY_BUY && RSIDecision==ENTRY_BUY && AverageRangeDecision==1)
     {
-        ticket = OrderSend(Symbol(), OP_BUY, Lots, Ask, 1, Bid-StopLose*Point, Bid+TakeProfit*Point, "test_buy", MagicNum, 0, Green);
+        ticket = OrderSend(Symbol(), OP_BUY, Lots, Ask, 1, Bid-sl, Bid+tp, "test_buy", MagicNum, 0, Green);
         if(ticket<0){    ProcessError(GetLastError());}
         DivergenceDecision = 0;
         RSIDecision = 0;
@@ -409,7 +412,7 @@ void ComeonMoney()
     }
     if(DivergenceDecision==ENTRY_SELL && RSIDecision==ENTRY_SELL && AverageRangeDecision==1)
     {
-        ticket = OrderSend(Symbol(), OP_SELL, Lots, Bid, 1, Ask+StopLose*Point, Ask-TakeProfit*Point, "test_sell", MagicNum, 0, Green);
+        ticket = OrderSend(Symbol(), OP_SELL, Lots, Bid, 1, Ask+sl, Ask-tp, "test_sell", MagicNum, 0, Green);
         if(ticket<0){    ProcessError(GetLastError());}
         DivergenceDecision = 0;
         RSIDecision = 0;
