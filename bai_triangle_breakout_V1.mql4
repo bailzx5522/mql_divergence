@@ -30,7 +30,6 @@ double AvgRange_5B;
 double AvgRange_10B;
 double retrace_low, break_up;
 double retrace_high, break_down;
-int break_up_point, break_down_point;
 bool wait_buy = False;
 bool wait_sell = False;
 int MagicNum = 5522250;
@@ -40,8 +39,6 @@ int MagicNum = 5522250;
 int OnInit()
   {
 //---
-   break_up_point=0;
-   break_down_point=0;
 //---
    return(INIT_SUCCEEDED);
   }
@@ -100,9 +97,6 @@ void CalcuteAvgRange()
 //+------------------------------------------------------------------+
 void DetectDoublePeak()
 {
-    if(break_up_point>0)
-    {break_up_point++;return;}
-    if(break_down_point>0){break_down_point++;return;}
     int i;
     double high_last = High[1];
     double low_last = Low[1];
@@ -116,8 +110,6 @@ void DetectDoublePeak()
             retrace_low = iLowest(Symbol(), 0, MODE_LOW, i, 1);            // first low retracement
             break_up = High[i];
             wait_buy = True;
-            break_up_point = 1;
-            Print("--------------",break_up_point);
             return;
         }
     }
@@ -132,8 +124,6 @@ void DetectDoublePeak()
             retrace_high = iHighest(Symbol(), 0, MODE_HIGH, i, 1);
             break_down = Low[i];
             wait_sell = True;
-            break_down_point = 1;
-            Print("--------------",break_down_point);
             return;
         }
     }
@@ -143,18 +133,23 @@ void DetectDoublePeak()
 void ReadyForMakeMoney()
 {
     double sl, tp;
-    int ret;
-    Print("--------------",break_up_point);
-    if(wait_buy && break_up_point>0)
+    int i,ret;
+    if(wait_buy)
     {
-        //TODO maybe waste some odd chances
-        if(High[1]==break_up)
+        for(i=1; i<50; i++)
         {
-            wait_buy = False;                           //There should be one more times retracement
+            if(break_up==High[i])
+            {
+                break;
+            }
+        }
+        //TODO maybe waste some odd chances
+        if(i==1 || i==50)                               //There should be one more times retracement
+        {
+            wait_buy = False;
             break_up_point = 0;
             return;
         }
-        
         if(Ask - break_up > 20*Point && iLowest(Symbol(), 0, MODE_LOW, break_up_point, 0)<retrace_low)
         {
             sl = break_up - retrace_low;
@@ -166,8 +161,7 @@ void ReadyForMakeMoney()
             return;
         }
     }
-    Print("--------------",break_down_point);
-    if(wait_sell && break_down_point>0)
+    if(wait_sell)
     {
         if(Low[1]==break_down)
         {
