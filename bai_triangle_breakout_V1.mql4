@@ -88,12 +88,13 @@ void CalcuteAvgRange()
 
 //+------------------------------------------------------------------+
 //| Triangle breakout pattern                                        |
-//               E
-//    P     P   -
-//     -   - - -
-//      - -   o
-//       o   
-// First, "o" is higher low. At the sametime is a side of triangle.  |
+//                 E                                                 |
+//    P      P    -                                                  |
+//     -    - -  -                                                   |
+//      -  -   L2                                                    |
+//       L1                                                          |
+// First, "L" is higher low. It's retracement. At the sametime it's  |
+// one side of triangle.                                             |
 // And the another side of the triangle is up resistant.             |
 // "E" is the entry point. "P" is so called "POINT TO POINT".        |
 //+------------------------------------------------------------------+
@@ -115,7 +116,7 @@ void DetectDoublePeak()
             retrace_low = iLowest(Symbol(), 0, MODE_LOW, i, 1);            // first low retracement
             break_up = High[i];
             wait_buy = True;
-            break_up_point = i;
+            break_up_point = 1;
             Print("--------------",break_up_point);
             return;
         }
@@ -131,7 +132,7 @@ void DetectDoublePeak()
             retrace_high = iHighest(Symbol(), 0, MODE_HIGH, i, 1);
             break_down = Low[i];
             wait_sell = True;
-            break_down_point = i;
+            break_down_point = 1;
             Print("--------------",break_down_point);
             return;
         }
