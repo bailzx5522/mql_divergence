@@ -62,7 +62,8 @@ void OnTick()
             "Average Range in 10 5MIN_Bars:", AvgRange_10B, "\n");
 
     ReadyForMakeMoney();                                            //Entry Market anytime
-    if(Volume[0]>1) return;    
+    if(Volume[0]>1) return;
+    if(wait_buy || wait_sell)   return;                              //Only ONE waiting trade
     DetectDoublePeak();                                             //Detect everyone new bars
   }
 //+------------------------------------------------------------------+
@@ -107,7 +108,7 @@ void DetectDoublePeak()
         if(high_last == High[i])
         {
             if(i<5){continue;}                                              // too close to ooxx
-            retrace_low = iLowest(Symbol(), 0, MODE_LOW, i, 1);            // first low retracement
+            retrace_low = iLowest(Symbol(), 0, MODE_LOW, i, 1);             // first retracement
             break_up = High[i];
             wait_buy = True;
             return;
@@ -117,17 +118,16 @@ void DetectDoublePeak()
     //TODO performence
     for(i=2; i<50; i++)
     {
-        if(low_last > Low[i]){break;}
+        if(low_last > Low[i])   break;
         if(low_last == Low[i])
         {
-            if(i<5){continue;}
+            if(i<5) continue;
             retrace_high = iHighest(Symbol(), 0, MODE_HIGH, i, 1);
             break_down = Low[i];
             wait_sell = True;
             return;
         }
     }
-
 }
 
 void ReadyForMakeMoney()
@@ -147,7 +147,6 @@ void ReadyForMakeMoney()
         if(i==1 || i==50)                               //There should be one more times retracement
         {
             wait_buy = False;
-            break_up_point = 0;
             return;
         }
         if(Ask - break_up > 20*Point && iLowest(Symbol(), 0, MODE_LOW, i, 0)>retrace_low)
@@ -156,6 +155,8 @@ void ReadyForMakeMoney()
             tp = 4*sl;
             ret = OrderSend(Symbol(), OP_BUY, Lots, Ask, 1, Bid-sl, Bid+tp, "comment", MagicNum, 0, Green);
             wait_buy = False;
+            break_up = 0;
+            retrace_low = 0;
             return;
         }
     }
@@ -181,6 +182,8 @@ void ReadyForMakeMoney()
             tp = 4*sl;
             ret = OrderSend(Symbol(), OP_SELL, Lots, Bid, 1, Ask+sl, Ask-tp, "comment", MagicNum, 0, Red);
             wait_sell = False;
+            retrace_high = 0;
+            break_down = 0;
             return;
         }
     }
