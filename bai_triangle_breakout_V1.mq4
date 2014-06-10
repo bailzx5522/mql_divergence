@@ -30,8 +30,8 @@ double AvgRange_5B;
 double AvgRange_10B;
 double retrace_low, break_up;
 double retrace_high, break_down;
-bool wait_buy = False;
-bool wait_sell = False;
+bool wait_buy = false;
+bool wait_sell = false;
 int MagicNum = 5522250;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -104,13 +104,13 @@ void DetectDoublePeak()
     
     for(i=2; i<50; i++)
     {
-        if(high_last < High[i]){break;}
-        if(high_last == High[i])
+        if(high_last < High[i]) break;
+        if(MathAbs(high_last-High[i])<=5*Point)         //TODO may use AverageRange
         {
-            if(i<5){continue;}                                              // too close to ooxx
-            retrace_low = iLowest(Symbol(), 0, MODE_LOW, i, 1);             // first retracement
-            break_up = High[i];
-            wait_buy = True;
+            if(i<5) continue;                                                    // too close to ooxx
+            retrace_low = Low[iLowest(Symbol(), 0, MODE_LOW, i, 1)];             // first retracement
+            break_up = high_last;
+            wait_buy = true;
             return;
         }
     }
@@ -119,12 +119,13 @@ void DetectDoublePeak()
     for(i=2; i<50; i++)
     {
         if(low_last > Low[i])   break;
-        if(low_last == Low[i])
+        if(MathAbs(low_last-Low[i])<=5*Point)
         {
             if(i<5) continue;
-            retrace_high = iHighest(Symbol(), 0, MODE_HIGH, i, 1);
-            break_down = Low[i];
-            wait_sell = True;
+            retrace_high = High[iHighest(Symbol(), 0, MODE_HIGH, i, 1)];
+            break_down = low_last;
+            wait_sell = true;
+            Print("---------------------------break_down:",break_down);
             return;
         }
     }
@@ -133,28 +134,28 @@ void DetectDoublePeak()
 void ReadyForMakeMoney()
 {
     double sl, tp;
-    int i,ret;
+    int ret;
     if(wait_buy)
     {
-        for(i=1; i<50; i++)
+        if(Low[0]<retrace_low)                         //Second Rule:second retrace is higher than first
         {
-            if(break_up==High[i])
-            {
-                break;
-            }
-        }
-        //TODO maybe waste some odd chances
-        if(i==1 || i==50)                               //There should be one more times retracement
-        {
-            wait_buy = False;
+            //Print("---------------------PASS!2th retrace:",Low[0], "less than first:",retrace_low);
+            break_up = 0;
+            retrace_low = 0;
+            wait_buy = false;
             return;
         }
-        if(Ask - break_up > 20*Point && iLowest(Symbol(), 0, MODE_LOW, i, 0)>retrace_low)
+        if(Bid - break_up > 5*Point)
         {
-            sl = break_up - retrace_low;
-            tp = 4*sl;
-            ret = OrderSend(Symbol(), OP_BUY, Lots, Ask, 1, Bid-sl, Bid+tp, "comment", MagicNum, 0, Green);
-            wait_buy = False;
+            if(High[1]!=break_up && High[2]!=break_up && High[3]!=break_up)
+            {
+                sl = break_up - retrace_low;
+                sl = 60*Point;
+                tp = 4*sl;
+                Print("----------break_up:",break_up,"-----------retrace_low:",retrace_low);
+                ret = OrderSend(Symbol(), OP_BUY, Lots, Ask, 1, Bid-sl, Bid+tp, "comment", MagicNum, 0, Green);
+            }
+            wait_buy = false;
             break_up = 0;
             retrace_low = 0;
             return;
@@ -163,25 +164,25 @@ void ReadyForMakeMoney()
     //
     if(wait_sell)
     {
-        for(i=1; i<50; i++)
+        if(High[0]>retrace_high)
         {
-            if(break_down==Low[i])
-            {
-                break;
-            }
-        }
-        //TODO maybe waste some odd chances
-        if(i==1 || i==50)                               //There should be one more times retracement
-        {
-            wait_sell = False;
+            //Print("---------------------PASS!2th retrace:",High[0], "more than first:",retrace_high);
+            retrace_high = 0;
+            break_down = 0;
+            wait_sell = false;
             return;
         }
-        if(break_down-Bid>20*Point && iHighest(Symbol(), 0, MODE_HIGH, i, 0)<retrace_high)
+        if(break_down-Bid>5*Point)
         {
-            sl = retrace_high - break_down;
-            tp = 4*sl;
-            ret = OrderSend(Symbol(), OP_SELL, Lots, Bid, 1, Ask+sl, Ask-tp, "comment", MagicNum, 0, Red);
-            wait_sell = False;
+            if(Low[1]!=break_down && Low[2]!=break_down && Low[3]!=break_down)
+            {
+                sl = retrace_high - break_down;
+                sl = 60*Point;
+                tp = 4*sl;
+                Print("----------break_down:",break_down,"-----------retrace_high:",retrace_high);
+                ret = OrderSend(Symbol(), OP_SELL, Lots, Bid, 1, Ask+sl, Ask-tp, "comment", MagicNum, 0, Red);
+            }
+            wait_sell = false;
             retrace_high = 0;
             break_down = 0;
             return;
