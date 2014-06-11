@@ -104,13 +104,15 @@ void DetectDoublePeak()
     
     for(i=2; i<50; i++)
     {
-        if(high_last < High[i]) break;
-        if(MathAbs(high_last-High[i])<=5*Point)         //TODO may use AverageRange
+        //if(high_last < High[i]) break;
+        //if(MathAbs(high_last-High[i])<=5*Point)         //TODO may use AverageRange
+        if(high_last-High[i]<=5*Point && High[i]-high_last<=2*Point)             //TODO may use AverageRange to adjust more environment
         {
-            if(i<5) continue;                                                    // too close to ooxx
+            if(i<=5) continue;                                                    // too close to ooxx
             retrace_low = Low[iLowest(Symbol(), 0, MODE_LOW, i, 1)];             // first retracement
             break_up = high_last;
             wait_buy = true;
+            Print("---------------------------break_up:",break_up);
             return;
         }
     }
@@ -118,8 +120,9 @@ void DetectDoublePeak()
     //TODO performence
     for(i=2; i<50; i++)
     {
-        if(low_last > Low[i])   break;
-        if(MathAbs(low_last-Low[i])<=5*Point)
+        //if(low_last > Low[i])   break;
+        //if(MathAbs(low_last-Low[i])<=5*Point)
+        if(low_last-Low[i]<=2*Point && Low[i]-low_last<=5*Point)
         {
             if(i<5) continue;
             retrace_high = High[iHighest(Symbol(), 0, MODE_HIGH, i, 1)];
@@ -139,7 +142,7 @@ void ReadyForMakeMoney()
     {
         if(Low[0]<retrace_low)                         //Second Rule:second retrace is higher than first
         {
-            //Print("---------------------PASS!2th retrace:",Low[0], "less than first:",retrace_low);
+            Print("---------------------PASS!2th retrace:",Low[0], "less than first:",retrace_low);
             break_up = 0;
             retrace_low = 0;
             wait_buy = false;
@@ -154,6 +157,8 @@ void ReadyForMakeMoney()
                 tp = 4*sl;
                 Print("----------break_up:",break_up,"-----------retrace_low:",retrace_low);
                 ret = OrderSend(Symbol(), OP_BUY, Lots, Ask, 1, Bid-sl, Bid+tp, "comment", MagicNum, 0, Green);
+            }else{
+                Print("---------------------PASS!too close to breakup!");
             }
             wait_buy = false;
             break_up = 0;
@@ -166,7 +171,7 @@ void ReadyForMakeMoney()
     {
         if(High[0]>retrace_high)
         {
-            //Print("---------------------PASS!2th retrace:",High[0], "more than first:",retrace_high);
+            Print("---------------------PASS!2th retrace:",High[0], "more than first:",retrace_high);
             retrace_high = 0;
             break_down = 0;
             wait_sell = false;
@@ -181,6 +186,9 @@ void ReadyForMakeMoney()
                 tp = 4*sl;
                 Print("----------break_down:",break_down,"-----------retrace_high:",retrace_high);
                 ret = OrderSend(Symbol(), OP_SELL, Lots, Bid, 1, Ask+sl, Ask-tp, "comment", MagicNum, 0, Red);
+            }
+            else{
+                Print("---------------------PASS!too close to breakdown!");
             }
             wait_sell = false;
             retrace_high = 0;
