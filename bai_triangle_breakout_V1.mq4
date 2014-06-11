@@ -63,7 +63,7 @@ void OnTick()
 
     ReadyForMakeMoney();                                            //Entry Market anytime
     if(Volume[0]>1) return;
-    if(wait_buy || wait_sell)   return;                              //Only ONE waiting trade
+    //if(wait_buy || wait_sell)   return;                              //Only ONE waiting trade
     DetectDoublePeak();                                             //Detect everyone new bars
   }
 //+------------------------------------------------------------------+
@@ -104,7 +104,8 @@ void DetectDoublePeak()
     
     for(i=2; i<50; i++)
     {
-        //if(high_last < High[i]) break;
+        if(wait_buy)    break;
+        if(High[i]-high_last>2*Point) break;
         //if(MathAbs(high_last-High[i])<=5*Point)         //TODO may use AverageRange
         if(high_last-High[i]<=5*Point && High[i]-high_last<=2*Point)             //TODO may use AverageRange to adjust more environment
         {
@@ -112,7 +113,7 @@ void DetectDoublePeak()
             retrace_low = Low[iLowest(Symbol(), 0, MODE_LOW, i, 1)];             // first retracement
             break_up = high_last;
             wait_buy = true;
-            Print("---------------------------break_up:",break_up);
+            Print(High[i],"---------------------------break_up:",break_up);
             return;
         }
     }
@@ -120,7 +121,8 @@ void DetectDoublePeak()
     //TODO performence
     for(i=2; i<50; i++)
     {
-        //if(low_last > Low[i])   break;
+        if(wait_sell)   break;
+        if(low_last-Low[i]>2*Point)   break;
         //if(MathAbs(low_last-Low[i])<=5*Point)
         if(low_last-Low[i]<=2*Point && Low[i]-low_last<=5*Point)
         {
@@ -128,7 +130,7 @@ void DetectDoublePeak()
             retrace_high = High[iHighest(Symbol(), 0, MODE_HIGH, i, 1)];
             break_down = low_last;
             wait_sell = true;
-            Print("---------------------------break_down:",break_down);
+            Print(i,"---------------------------break_down:",break_down);
             return;
         }
     }
@@ -140,7 +142,7 @@ void ReadyForMakeMoney()
     int ret;
     if(wait_buy)
     {
-        if(Low[0]<retrace_low)                         //Second Rule:second retrace is higher than first
+        if(Low[0]<retrace_low || (High[0]>break_up && High[1]==break_up))           //Second Rule:second retrace is higher than first
         {
             Print("---------------------PASS!2th retrace:",Low[0], "less than first:",retrace_low);
             break_up = 0;
@@ -148,13 +150,13 @@ void ReadyForMakeMoney()
             wait_buy = false;
             return;
         }
-        if(Bid - break_up > 5*Point)
+        if(Bid - break_up > 10*Point)
         {
             if(High[1]!=break_up && High[2]!=break_up && High[3]!=break_up)
             {
                 sl = break_up - retrace_low;
                 sl = 60*Point;
-                tp = 4*sl;
+                tp = 3*sl;
                 Print("----------break_up:",break_up,"-----------retrace_low:",retrace_low);
                 ret = OrderSend(Symbol(), OP_BUY, Lots, Ask, 1, Bid-sl, Bid+tp, "comment", MagicNum, 0, Green);
             }else{
@@ -169,7 +171,7 @@ void ReadyForMakeMoney()
     //
     if(wait_sell)
     {
-        if(High[0]>retrace_high)
+        if(High[0]>retrace_high || (Low[0]<break_down && Low[1]==break_down))
         {
             Print("---------------------PASS!2th retrace:",High[0], "more than first:",retrace_high);
             retrace_high = 0;
@@ -177,13 +179,13 @@ void ReadyForMakeMoney()
             wait_sell = false;
             return;
         }
-        if(break_down-Bid>5*Point)
+        if(break_down-Bid>10*Point)
         {
             if(Low[1]!=break_down && Low[2]!=break_down && Low[3]!=break_down)
             {
                 sl = retrace_high - break_down;
                 sl = 60*Point;
-                tp = 4*sl;
+                tp = 3*sl;
                 Print("----------break_down:",break_down,"-----------retrace_high:",retrace_high);
                 ret = OrderSend(Symbol(), OP_SELL, Lots, Bid, 1, Ask+sl, Ask-tp, "comment", MagicNum, 0, Red);
             }
@@ -197,4 +199,3 @@ void ReadyForMakeMoney()
         }
     }
 }
-
