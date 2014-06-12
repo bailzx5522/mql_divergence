@@ -19,6 +19,9 @@
 #property link      "http://www.mql5.com"
 #property version   "1.00"
 #property strict
+#define C_FREE 0
+#define C_BUY 1
+#define C_SELL 2
 //------------------------------
 // INPUT
 //------------------------------
@@ -26,25 +29,33 @@ extern double    Lots = 0.1;
 //------------------------------
 // Global
 //------------------------------
-double AvgRange_5B;
-double AvgRange_10B;
-double candidate_buy[5],candidate_sell[5];
-bool wait_buy = false;
-bool wait_sell = false;
+struct candidate
+{
+    double rs;                  //price of resistant or support(one side of triangle)
+    double retrace;             //first retracement
+    int direct;                 // 0-free 1-buy 2-sell
+};
+candidate candidates[5];        // 5 candidates
 int MagicNum = 5522250;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
-  {
-   return(INIT_SUCCEEDED);
-  }
+{
+    for(int i=0; i<ArrayRange(candidates, 0); i++)
+    {
+        candidates[i].rs = 0;
+        candidates[i].retrace = 0;
+        candidates[i].direct = 0;
+    }
+    return(INIT_SUCCEEDED);
+}
 //+------------------------------------------------------------------+
 //| Expert deinitialization function                                 |
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
-  {
-  }
+{
+}
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
 //+------------------------------------------------------------------+
@@ -60,7 +71,6 @@ void OnTick()
 
     ReadyForMakeMoney();                                            //Entry Market anytime
     if(Volume[0]>1) return;
-    //if(wait_buy || wait_sell)   return;                              //Only ONE waiting trade
     DetectDoublePeak();                                             //Detect everyone new bars
   }
 //+------------------------------------------------------------------+
@@ -68,28 +78,11 @@ double CalcuteAvgRange(int cal_bars)
 {
     int i;
     double sum = 0;
-    if(cal_bars>0)
+    for(i=1; i<cal_bars+1; i++)
     {
-        for(i=1; i<cal_bars+1; i++)
-        {
-            sum += (High[i]-Low[i]);
-        }
-        return sum/cal_bars;
+        sum += (High[i]-Low[i]);
     }
-    else
-    {
-        for(i=1; i<6; i++)
-        {
-            sum += (High[i]-Low[i]);
-        }
-        AvgRange_5B = sum/5;
-        sum = 0;
-        for(i=1; i<11; i++)
-        {
-            sum += (High[i] - Low[i]);
-        }
-        AvgRange_5B = sum/10;
-    }
+    return sum/cal_bars;
 }
 
 //+------------------------------------------------------------------+
@@ -106,25 +99,32 @@ double CalcuteAvgRange(int cal_bars)
 //+------------------------------------------------------------------+
 void DetectDoublePeak()
 {
-    int i;
+    int i, j;
     double high_last = High[1];
     double low_last = Low[1];
-    double resistance, support, retrace_low, retrace_high;
+    double retrace_low, retrace_high;
     
     for(i=2; i<50; i++)
     {
-        if(wait_buy)    break;
         if(High[i]-high_last>2*Point) break;
         if(high_last-High[i]<=5*Point && High[i]-high_last<=2*Point)             //TODO may use AverageRange to adjust more environment
         {
             if(i<=5) continue;                                                   // too close to ooxx
             retrace_low = Low[iLowest(Symbol(), 0, MODE_LOW, i, 1)];             // first retracement
-            resistance = high_last;
             
-            if(resistance-retrace_low<2*CalcuteAvgRange(i)) continue;            // Here need a fairly bounce(twice than AverageRange)
+            if(high_last-retrace_low<2*CalcuteAvgRange(i)) continue;            // Here need a fairly bounce(twice than AverageRange)
 
-            wait_buy = true;
-            Print(High[i],"---------------------------resistance:",resistance);
+            for(j=0; j<5; j++)
+            {
+                if(candidates[j].direct == C_FREE)
+                {
+                    candidates[j].rs = high_last;
+                    candidates[j].retrace = retrace_low;
+                    candidates[j].direct = C_BUY;
+                    Print("---------------------------buy candidate:",candidates[j].rs);
+                    break;
+                }
+            }
             return;
         }
     }
@@ -132,16 +132,23 @@ void DetectDoublePeak()
     //TODO performence
     for(i=2; i<50; i++)
     {
-        if(wait_sell)   break;
         if(low_last-Low[i]>2*Point)   break;
         if(low_last-Low[i]<=2*Point && Low[i]-low_last<=5*Point)
         {
             if(i<5) continue;
             retrace_high = High[iHighest(Symbol(), 0, MODE_HIGH, i, 1)];
-            support = low_last;
-            if(retrace_high-support<2*CalcuteAvgRange(i)) continue;
-            wait_sell = true;
-            Print(i,"---------------------------support:",support);
+            if(retrace_high-low_last<2*CalcuteAvgRange(i)) continue;
+            for(j=0; j<5; j++)
+            {
+                if(candidates[j].direct == C_FREE)
+                {
+                    candidates[j].rs = low_last;
+                    candidates[j].retrace = retrace_high;
+                    candidates[j].direct = C_SELL;
+                    Print("---------------------------sell candidate:",candidates[j].rs);
+                    break;
+                }
+            }
             return;
         }
     }
@@ -150,63 +157,65 @@ void DetectDoublePeak()
 void ReadyForMakeMoney()
 {
     double sl, tp;
-    int ret;
-    if(wait_buy)
+    int i, ret;
+    for(i=0; i<ArrayRange(candidates, 0); i++)
     {
-        if(Low[0]<retrace_low || (High[0]>break_up && High[1]==break_up))           //Second Rule:second retrace is higher than first
+        if(candidates[i].direct==C_BUY)
         {
-            Print("---------------------PASS!2th retrace:",Low[0], "less than first:",retrace_low);
-            break_up = 0;
-            retrace_low = 0;
-            wait_buy = false;
-            return;
-        }
-        if(Bid - break_up > 10*Point)
-        {
-            if(High[1]!=break_up && High[2]!=break_up && High[3]!=break_up)
+            if(Low[0]<candidates[i].retrace || (High[0]>candidates[i].rs && High[1]==candidates[i].rs))           //Second Rule:second retrace is higher than first
             {
-                sl = break_up - retrace_low;
-                sl = 60*Point;
-                tp = 3*sl;
-                Print("----------break_up:",break_up,"-----------retrace_low:",retrace_low);
-                ret = OrderSend(Symbol(), OP_BUY, Lots, Ask, 1, Bid-sl, Bid+tp, "comment", MagicNum, 0, Green);
-            }else{
-                Print("---------------------PASS!too close to breakup!");
+                Print("---------------------PASS!2th retrace:",Low[0], "less than first:",candidates[i].retrace);
+                candidates[i].retrace = 0;
+                candidates[i].rs = 0;
+                candidates[i].direct = C_FREE;
+                return;
             }
-            wait_buy = false;
-            break_up = 0;
-            retrace_low = 0;
-            return;
-        }
-    }
-    //
-    if(wait_sell)
-    {
-        if(High[0]>retrace_high || (Low[0]<break_down && Low[1]==break_down))
-        {
-            Print("---------------------PASS!2th retrace:",High[0], "more than first:",retrace_high);
-            retrace_high = 0;
-            break_down = 0;
-            wait_sell = false;
-            return;
-        }
-        if(break_down-Bid>10*Point)
-        {
-            if(Low[1]!=break_down && Low[2]!=break_down && Low[3]!=break_down)
+            if(Bid - candidates[i].rs > 10*Point)
             {
-                sl = retrace_high - break_down;
-                sl = 60*Point;
-                tp = 3*sl;
-                Print("----------break_down:",break_down,"-----------retrace_high:",retrace_high);
-                ret = OrderSend(Symbol(), OP_SELL, Lots, Bid, 1, Ask+sl, Ask-tp, "comment", MagicNum, 0, Red);
+                if(High[1]!=candidates[i].rs && High[2]!=candidates[i].rs && High[3]!=candidates[i].rs)
+                {
+                    sl = candidates[i].rs - candidates[i].rs;
+                    sl = 60*Point;
+                    tp = 3*sl;
+                    Print("----------break_up:",candidates[i].rs,"-----------retrace_low:",candidates[i].rs);
+                    ret = OrderSend(Symbol(), OP_BUY, Lots, Ask, 1, Bid-sl, Bid+tp, "comment", MagicNum, 0, Green);
+                }else{
+                    Print("---------------------PASS!too close to breakup!");
+                }
+                candidates[i].direct = C_FREE;
+                candidates[i].retrace = 0;
+                candidates[i].rs = 0;
+                return;
             }
-            else{
-                Print("---------------------PASS!too close to breakdown!");
+        }
+        else if(candidates[i].direct==C_SELL)
+        {
+            if(High[0]>candidates[i].retrace || (Low[0]<candidates[i].rs && Low[1]==candidates[i].rs))
+            {
+                Print("---------------------PASS!2th retrace:",High[0], "more than first:",candidates[i].retrace);
+                candidates[i].retrace = 0;
+                candidates[i].rs = 0;
+                candidates[i].direct = C_FREE;
+                return;
             }
-            wait_sell = false;
-            retrace_high = 0;
-            break_down = 0;
-            return;
+            if(candidates[i].rs-Bid>10*Point)
+            {
+                if(Low[1]!=candidates[i].rs && Low[2]!=candidates[i].rs && Low[3]!=candidates[i].rs)
+                {
+                    sl = candidates[i].retrace - candidates[i].rs;
+                    sl = 60*Point;
+                    tp = 3*sl;
+                    Print("----------break_down:",candidates[i].rs,"-----------retrace_high:",candidates[i].retrace);
+                    ret = OrderSend(Symbol(), OP_SELL, Lots, Bid, 1, Ask+sl, Ask-tp, "comment", MagicNum, 0, Red);
+                }
+                else{
+                    Print("---------------------PASS!too close to breakdown!");
+                }
+                candidates[i].direct = C_FREE;
+                candidates[i].retrace = 0;
+                candidates[i].rs = 0;
+                return;
+            }
         }
     }
 }
