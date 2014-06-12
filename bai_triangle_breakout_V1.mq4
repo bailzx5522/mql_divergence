@@ -28,8 +28,7 @@ extern double    Lots = 0.1;
 //------------------------------
 double AvgRange_5B;
 double AvgRange_10B;
-double retrace_low, break_up;
-double retrace_high, break_down;
+double candidate_buy[5],candidate_sell[5];
 bool wait_buy = false;
 bool wait_sell = false;
 int MagicNum = 5522250;
@@ -38,8 +37,6 @@ int MagicNum = 5522250;
 //+------------------------------------------------------------------+
 int OnInit()
   {
-//---
-//---
    return(INIT_SUCCEEDED);
   }
 //+------------------------------------------------------------------+
@@ -47,8 +44,6 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-//---
-   
   }
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
@@ -56,10 +51,12 @@ void OnDeinit(const int reason)
 void OnTick()
   {
 //---
+    /**
     CalcuteAvgRange();
     Comment("bai_trangle_breakout_V1 EA\n",
             "Average Range in 5 5MIN_Bars:", AvgRange_5B, "\n",
             "Average Range in 10 5MIN_Bars:", AvgRange_10B, "\n");
+    **/
 
     ReadyForMakeMoney();                                            //Entry Market anytime
     if(Volume[0]>1) return;
@@ -67,21 +64,32 @@ void OnTick()
     DetectDoublePeak();                                             //Detect everyone new bars
   }
 //+------------------------------------------------------------------+
-void CalcuteAvgRange()
+double CalcuteAvgRange(int cal_bars)
 {
     int i;
     double sum = 0;
-    for(i=1; i<6; i++)
+    if(cal_bars>0)
     {
-        sum += (High[i]-Low[i]);
+        for(i=1; i<cal_bars+1; i++)
+        {
+            sum += (High[i]-Low[i]);
+        }
+        return sum/cal_bars;
     }
-    AvgRange_5B = sum/5;
-    sum = 0;
-    for(i=1; i<11; i++)
+    else
     {
-        sum += (High[i] - Low[i]);
+        for(i=1; i<6; i++)
+        {
+            sum += (High[i]-Low[i]);
+        }
+        AvgRange_5B = sum/5;
+        sum = 0;
+        for(i=1; i<11; i++)
+        {
+            sum += (High[i] - Low[i]);
+        }
+        AvgRange_5B = sum/10;
     }
-    AvgRange_5B = sum/10;
 }
 
 //+------------------------------------------------------------------+
@@ -101,19 +109,22 @@ void DetectDoublePeak()
     int i;
     double high_last = High[1];
     double low_last = Low[1];
+    double resistance, support, retrace_low, retrace_high;
     
     for(i=2; i<50; i++)
     {
         if(wait_buy)    break;
         if(High[i]-high_last>2*Point) break;
-        //if(MathAbs(high_last-High[i])<=5*Point)         //TODO may use AverageRange
         if(high_last-High[i]<=5*Point && High[i]-high_last<=2*Point)             //TODO may use AverageRange to adjust more environment
         {
-            if(i<=5) continue;                                                    // too close to ooxx
+            if(i<=5) continue;                                                   // too close to ooxx
             retrace_low = Low[iLowest(Symbol(), 0, MODE_LOW, i, 1)];             // first retracement
-            break_up = high_last;
+            resistance = high_last;
+            
+            if(resistance-retrace_low<2*CalcuteAvgRange(i)) continue;            // Here need a fairly bounce(twice than AverageRange)
+
             wait_buy = true;
-            Print(High[i],"---------------------------break_up:",break_up);
+            Print(High[i],"---------------------------resistance:",resistance);
             return;
         }
     }
@@ -123,14 +134,14 @@ void DetectDoublePeak()
     {
         if(wait_sell)   break;
         if(low_last-Low[i]>2*Point)   break;
-        //if(MathAbs(low_last-Low[i])<=5*Point)
         if(low_last-Low[i]<=2*Point && Low[i]-low_last<=5*Point)
         {
             if(i<5) continue;
             retrace_high = High[iHighest(Symbol(), 0, MODE_HIGH, i, 1)];
-            break_down = low_last;
+            support = low_last;
+            if(retrace_high-support<2*CalcuteAvgRange(i)) continue;
             wait_sell = true;
-            Print(i,"---------------------------break_down:",break_down);
+            Print(i,"---------------------------support:",support);
             return;
         }
     }
