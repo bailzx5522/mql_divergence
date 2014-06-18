@@ -74,14 +74,8 @@ void GetAvgRange()
 
 
 //+------------------------------------------------------------------+
-//| Get Resistant/Support Level in hours                             |
+//| Get Resistant/Support Level 		                             |
 //+------------------------------------------------------------------+
 void GetSRLevel()
 {
-	//p = Period()
-    high_10 = iHighest(Symbol(), PERIOD_M5, MODE_HIGH, 10,1);			//1-10
-    high_20 = iHighest(Symbol(), PERIOD_M5, MODE_HIGH, 20,11);			//11-30
-    high_30 = iHighest(Symbol(), PERIOD_M5, MODE_HIGH, 30,31);			//31-60
-    high_50 = Highest(Symbol(), PERIOD_M5, MODE_HIGH, 50,61);			//61-110
-
 }
