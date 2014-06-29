@@ -7,28 +7,45 @@
 #property link      "http://www.mql5.com"
 #property version   "1.00"
 #property strict
-extern version = "Bailingzhou FTD ver1.0 step.";
+//
+#define BUY  1
+#define SELL  2
+//
+extern string version = "Bailingzhou FTD ver1.0 step.";
 //Input
-extern string _comment1 = "Manipulate settings";
-extern bool manipulate  = false;
-extern int type         = 0;                             // 0:buy 1:sell
-extern double price     = 0;
-extern string _comment2 = "GRID settings";
-extern double lots      = 0.01;
-extern int ProfitTarget = 40;							// Minimum profit target in pips
-extern int increment    = 50;							// pips between levels
-extern int levels       = 3;							// number of levels of pending orders
-extern string _comment3 = "martingale settings"
+extern bool      use_bb = true;
+extern int       bb_period = 20;
+extern int       bb_deviation = 2;
+extern int       bb_shift = 0;
+extern double    BaseLot = 0.01;
+
+extern string    _comment1 = "0 = Use Default Settings";
+extern int       TakeProfit = 0;
+extern int       MaxSpread = 0;
+extern int       MaxTotalVol = 0;
 //Global
 int decision = 0;
-
+bool	_EnableAutoBuy	= true;
+bool	_EnableAutoSell	= true;
+int MagicNum = 20140629;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
 {
 //---
-   
+   if(TakeProfit == 0)
+   {
+      TakeProfit = 200;
+   }
+   if(MaxSpread == 0)
+   {
+      MaxSpread = 15;
+   }
+   if(MaxTotalVol == 0)
+   {
+      MaxTotalVol = 999;
+   }
 //---
    return(INIT_SUCCEEDED);
 }
@@ -37,7 +54,7 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-//---
+
    
 }
 //+------------------------------------------------------------------+
@@ -45,37 +62,114 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
-//---
-   if(manipulate)
+   ManageBuy();
+   //ManageSell();
+   //Display();
+}
+//+------------------------------------------------------------------+
+double spread() {
+	double s = (Ask - Bid) / Point;
+	return(s);
+}
+double MaxVol() {
+	return(MarketInfo(Symbol(),MODE_MAXLOT));
+}
+void NextStep(double TotalVolume)
+{
+   
+}
+
+void ManageBuy()
+{
+   double TP = Ask;
+   double SL = 0;
+   double TotalVol = 0;
+   double TotalProfit = 0;
+   double ThisVol = 0;
+   double AvgPrice = 0;
+   double FirstPrice = 0;
+   int i;
+   int count = 0;
+   int FirstOrder	= TimeCurrent();
+   
+   //Calculate
+   for(i=0; i<OrdersTotal(); i++)
    {
-      MakeOrders();
-      return;
+      if(OrderSelect(i, SELECT_BY_POS,MODE_TRADES) && OrderType()==OP_BUY && Symbol()==OrderSymbol() && OrderMagicNumber()==MagicNum)
+      {
+         // Should be stoploss, do not open orders
+    		if (OrderStopLoss() > 0 && OrderStopLoss()>=Bid) {
+				_EnableAutoBuy = false;
+			}
+         AvgPrice = (AvgPrice*TotalVol+OrderOpenPrice()*OrderLots()) / (TotalVol+OrderLots());
+         TP = (TP*TotalVol + OrderTakeProfit()*OrderLots()) / (TotalVol+OrderLots());
+         SL = (SL*TotalVol + OrderStopLoss()*OrderLots()) / (TotalVol+OrderLots());
+         TotalVol = TotalVol + OrderLots();
+         TotalProfit = TotalProfit + OrderProfit();
+         if(OrderOpenTime()<FirstOrder)
+         {
+            FirstOrder = OrderOpenTime();
+            FirstPrice = OrderOpenPrice();
+         }
+         
+         count++;
+      }
    }
-   GetAvgRange();
-   GetSRLevel();
-   MakeDesicion();
-   MakeOrders();
+   
+   RefreshRates();
+   if(MaxSpread>spread() && TotalVol<MaxTotalVol)
+   {
+      
+      double PriceDistance = (AvgPrice-Ask)/Point;
+      if (TotalVol == 0 && _EnableAutoBuy && MakeDecision()==BUY)
+      {
+			ThisVol = BaseLot;
+			OrderSend(Symbol(), OP_BUY, ThisVol, Ask, 1, 0, 0, NULL, MagicNum, 0);
+			for(i=1; i<10; i++)
+			{
+			   OrderSend(Symbol(), OP_BUYLIMIT , i*ThisVol, Ask-i*50*Point, 1, 0, 0, NULL, MagicNum, 0);
+			}
+		}
+   }
+   
+   RefreshRates();
+   if(TotalVol > 0 && Bid-AvgPrice>200*Point)
+	{
+	   for(i=OrdersTotal()-1; i>=0; i--)
+	   {
+	      if( OrderSelect(i,SELECT_BY_POS,MODE_TRADES) && OrderSymbol()==Symbol() && OrderMagicNumber()==MagicNum && OrderType()==OP_BUY )
+	      {
+	         OrderClose(OrderTicket(), OrderLots(), Bid, 1, 0);
+	      }
+	      if( OrderSelect(i,SELECT_BY_POS,MODE_TRADES) && OrderSymbol()==Symbol() && OrderMagicNumber()==MagicNum && OrderType()==OP_BUYLIMIT )
+	      {
+	         OrderDelete(OrderTicket(), 0);
+	      }
+      }
+	}
 }
-//+------------------------------------------------------------------+
 
-void MakeDesicion()
+void ManageSell()
 {
 }
 
-void MakeOrders()
+int MakeDecision()
 {
-    int i;
+   // running on 1H TF. Maybe run on 15M and reference on 1H
+   int tf = PERIOD_H1;
+   double upBB = iBands(Symbol(), tf, bb_period, bb_deviation, 0, PRICE_CLOSE, MODE_UPPER, bb_shift);
+   double loBB = iBands(Symbol(), tf, bb_period, bb_deviation, 0, PRICE_CLOSE, MODE_LOWER, bb_shift);
+
+   if(use_bb)
+   {
+      if(High[bb_shift]>upBB) return(SELL);
+      if(Low[bb_shift]<loBB)  return(BUY);
+   }
+   return(0);
 }
 
-
-void GetAvgRange()
+// display some comments
+void Display()
 {
-}
-
-
-//+------------------------------------------------------------------+
-//| Get Resistant/Support Level 		                             |
-//+------------------------------------------------------------------+
-void GetSRLevel()
-{
+   Comment("");
 }
