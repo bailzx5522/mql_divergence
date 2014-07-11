@@ -23,10 +23,14 @@ extern string    _comment1 = "0 = Use Default Settings";
 extern int       TakeProfit = 0;
 extern int       MaxSpread = 0;
 extern int       MaxTotalVol = 0;
+extern int       MaxGrid = 10;
+extern int       GridSize = 50;
+extern int       GridProfit = 200;
+
+extern int times = 9999;
+extern bool	_EnableAutoBuy	= true;
+extern bool	_EnableAutoSell= true;
 //Global
-int decision = 0;
-bool	_EnableAutoBuy	= true;
-bool	_EnableAutoSell	= true;
 int MagicNum = 20140629;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -63,7 +67,7 @@ void OnDeinit(const int reason)
 void OnTick()
 {
    ManageBuy();
-   //ManageSell();
+   ManageSell();
    //Display();
 }
 //+------------------------------------------------------------------+
@@ -74,9 +78,14 @@ double spread() {
 double MaxVol() {
 	return(MarketInfo(Symbol(),MODE_MAXLOT));
 }
-void NextStep(double TotalVolume)
+void CalNextStep(double TotalVolume)
 {
    
+}
+
+double CalNextVol(double v)
+{
+   return 0.01+v;
 }
 
 void ManageBuy()
@@ -86,11 +95,11 @@ void ManageBuy()
    double TotalVol = 0;
    double TotalProfit = 0;
    double ThisVol = 0;
-   double AvgPrice = 0;
+   double AvgPrice = Ask;
    double FirstPrice = 0;
-   int i;
+   int i, ret;
    int count = 0;
-   int FirstOrder	= TimeCurrent();
+   int FirstOrder	= int(TimeCurrent());
    
    //Calculate
    for(i=0; i<OrdersTotal(); i++)
@@ -117,33 +126,35 @@ void ManageBuy()
    }
    
    RefreshRates();
-   if(MaxSpread>spread() && TotalVol<MaxTotalVol)
+   if(MaxSpread>spread() && TotalVol<MaxTotalVol && times > 0)
    {
       
       double PriceDistance = (AvgPrice-Ask)/Point;
       if (TotalVol == 0 && _EnableAutoBuy && MakeDecision()==BUY)
       {
 			ThisVol = BaseLot;
-			OrderSend(Symbol(), OP_BUY, ThisVol, Ask, 1, 0, 0, NULL, MagicNum, 0);
-			for(i=1; i<10; i++)
+			ret = OrderSend(Symbol(), OP_BUY, ThisVol, Ask, 1, 0, 0, NULL, MagicNum, 0);
+			for(i=1; i<MaxGrid; i++)
 			{
-			   OrderSend(Symbol(), OP_BUYLIMIT , i*ThisVol, Ask-i*50*Point, 1, 0, 0, NULL, MagicNum, 0);
+			   ThisVol = CalNextVol(ThisVol);
+			   ret = OrderSend(Symbol(), OP_BUYLIMIT , ThisVol, Ask-i*GridSize*Point, 1, 0, 0, NULL, MagicNum, 0);
 			}
+			times--;
 		}
    }
    
    RefreshRates();
-   if(TotalVol > 0 && Bid-AvgPrice>200*Point)
+   if(TotalVol > 0 && Bid-AvgPrice>GridProfit*Point)
 	{
 	   for(i=OrdersTotal()-1; i>=0; i--)
 	   {
 	      if( OrderSelect(i,SELECT_BY_POS,MODE_TRADES) && OrderSymbol()==Symbol() && OrderMagicNumber()==MagicNum && OrderType()==OP_BUY )
 	      {
-	         OrderClose(OrderTicket(), OrderLots(), Bid, 1, 0);
+	         ret = OrderClose(OrderTicket(), OrderLots(), Bid, 1, 0);
 	      }
 	      if( OrderSelect(i,SELECT_BY_POS,MODE_TRADES) && OrderSymbol()==Symbol() && OrderMagicNumber()==MagicNum && OrderType()==OP_BUYLIMIT )
 	      {
-	         OrderDelete(OrderTicket(), 0);
+	         ret = OrderDelete(OrderTicket(), 0);
 	      }
       }
 	}
@@ -151,6 +162,74 @@ void ManageBuy()
 
 void ManageSell()
 {
+   double TP = Bid;
+   double SL = 0;
+   double TotalVol = 0;
+   double TotalProfit = 0;
+   double ThisVol = 0;
+   double AvgPrice = Bid;
+   double FirstPrice = 0;
+   int i, ret;
+   int count = 0;
+   int FirstOrder	= int(TimeCurrent());
+   
+   //Calculate
+   for(i=0; i<OrdersTotal(); i++)
+   {
+      if(OrderSelect(i, SELECT_BY_POS,MODE_TRADES) && OrderType()==OP_SELL && Symbol()==OrderSymbol() && OrderMagicNumber()==MagicNum)
+      {
+         // Should be stoploss, do not open orders
+    		if (OrderStopLoss() > 0 && OrderStopLoss()<=Ask) {
+				_EnableAutoSell = false;
+			}
+         AvgPrice = (AvgPrice*TotalVol+OrderOpenPrice()*OrderLots()) / (TotalVol+OrderLots());
+         TP = (TP*TotalVol + OrderTakeProfit()*OrderLots()) / (TotalVol+OrderLots());
+         SL = (SL*TotalVol + OrderStopLoss()*OrderLots()) / (TotalVol+OrderLots());
+         TotalVol = TotalVol + OrderLots();
+         TotalProfit = TotalProfit + OrderProfit();
+         if(OrderOpenTime()<FirstOrder)
+         {
+            FirstOrder = OrderOpenTime();
+            FirstPrice = OrderOpenPrice();
+         }
+         
+         count++;
+      }
+   }
+   
+   RefreshRates();
+   if(MaxSpread>spread() && TotalVol<MaxTotalVol && times>0)
+   {
+      
+      double PriceDistance = (Bid-AvgPrice)/Point;
+      if (TotalVol == 0 && _EnableAutoSell && MakeDecision()==SELL)
+      {
+         ThisVol = BaseLot;
+			ret = OrderSend(Symbol(), OP_SELL, ThisVol, Bid, 1, 0, 0, NULL, MagicNum, 0);
+			for(i=1; i<MaxGrid; i++)
+			{
+			   ThisVol = CalNextVol(ThisVol);
+			   ret = OrderSend(Symbol(), OP_SELLLIMIT , ThisVol, Bid+i*GridSize*Point, 1, 0, 0, NULL, MagicNum, 0);
+			}
+			times--;
+		}
+   }
+   
+   RefreshRates();
+   if(TotalVol > 0 && AvgPrice-Ask>GridProfit*Point)
+	{
+	   for(i=OrdersTotal()-1; i>=0; i--)
+	   {
+	      if( OrderSelect(i,SELECT_BY_POS,MODE_TRADES) && OrderSymbol()==Symbol() && OrderMagicNumber()==MagicNum && OrderType()==OP_SELL )
+	      {
+	         ret = OrderClose(OrderTicket(), OrderLots(), Ask, 1, 0);
+	      }
+	      if( OrderSelect(i,SELECT_BY_POS,MODE_TRADES) && OrderSymbol()==Symbol() && OrderMagicNumber()==MagicNum && OrderType()==OP_SELLLIMIT )
+	      {
+	         ret = OrderDelete(OrderTicket(), 0);
+	      }
+      }
+	}
 }
 
 int MakeDecision()
