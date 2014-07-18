@@ -2,10 +2,15 @@
 //|                                                      bai_FTD.mq4 |
 //|                        Copyright 2014, MetaQuotes Software Corp. |
 //|                                              http://www.mql5.com |
+//|Author:bailingzhou                                                |
+//|Version v1.00                                                     |
+//|   initial version                                                |
+//|Version v1.10                                                     |
+//|   Add hedge while a "fairly" trend performing                    |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2014, MetaQuotes Software Corp."
 #property link      "http://www.mql5.com"
-#property version   "1.00"
+#property version   "1.10"
 #property strict
 //
 #define BUY  1
