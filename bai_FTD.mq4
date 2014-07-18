@@ -40,8 +40,21 @@ int OnInit()
 //---
    if(TakeProfit == 0)
    {
-      TakeProfit = 200;
+      if(StringFind(Symbol(),"EURUSD") >=0){
+         TakeProfit	= 100;
+		} else if (StringFind(Symbol(),"USDJPY") >=0) {
+			TakeProfit	= 100;
+		} else if (StringFind(Symbol(),"GBPUSD") >=0) {
+			TakeProfit	= 200;
+		} else if (StringFind(Symbol(),"EURJPY") >=0) {
+			TakeProfit	= 200;
+		} else if (StringFind(Symbol(),"GBPJPY") >=0) {
+			TakeProfit	= 300;
+		} else {
+			TakeProfit	= 100;
+		}
    }
+   
    if(MaxSpread == 0)
    {
       MaxSpread = 15;
@@ -57,9 +70,7 @@ int OnInit()
 //| Expert deinitialization function                                 |
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
-{
-
-   
+{  
 }
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
@@ -78,14 +89,16 @@ double spread() {
 double MaxVol() {
 	return(MarketInfo(Symbol(),MODE_MAXLOT));
 }
-void CalNextStep(double TotalVolume)
+
+double CalNextPos(double v, int i)
 {
-   
+   // 50,60,70...
+   return NormalizeDouble(v+GridSize+10*(i-1)*Point, Digits);
 }
 
 double CalNextVol(double v)
 {
-   return 0.01+v;
+   return NormalizeDouble(1.2*v, 3);
 }
 
 void ManageBuy()
@@ -95,6 +108,7 @@ void ManageBuy()
    double TotalVol = 0;
    double TotalProfit = 0;
    double ThisVol = 0;
+   double ThisPos = 0;
    double AvgPrice = Ask;
    double FirstPrice = 0;
    int i, ret;
@@ -128,21 +142,24 @@ void ManageBuy()
    RefreshRates();
    if(MaxSpread>spread() && TotalVol<MaxTotalVol && times > 0)
    {
-      
       double PriceDistance = (AvgPrice-Ask)/Point;
+      
       if (TotalVol == 0 && _EnableAutoBuy && MakeDecision()==BUY)
       {
 			ThisVol = BaseLot;
 			ret = OrderSend(Symbol(), OP_BUY, ThisVol, Ask, 1, 0, 0, NULL, MagicNum, 0);
 			for(i=1; i<MaxGrid; i++)
 			{
+			   ThisPos = CalNextPos(ThisPos, i);
 			   ThisVol = CalNextVol(ThisVol);
-			   ret = OrderSend(Symbol(), OP_BUYLIMIT , ThisVol, Ask-i*GridSize*Point, 1, 0, 0, NULL, MagicNum, 0);
+
+			   ret = OrderSend(Symbol(), OP_BUYLIMIT , ThisVol, Ask-ThisPos, 1, 0, 0, NULL, MagicNum, 0);
 			}
 			times--;
 		}
    }
    
+   // Profit reached, close open & delete pending.
    RefreshRates();
    if(TotalVol > 0 && Bid-AvgPrice>GridProfit*Point)
 	{
@@ -167,6 +184,7 @@ void ManageSell()
    double TotalVol = 0;
    double TotalProfit = 0;
    double ThisVol = 0;
+   double ThisPos = 0;
    double AvgPrice = Bid;
    double FirstPrice = 0;
    int i, ret;
@@ -209,7 +227,8 @@ void ManageSell()
 			for(i=1; i<MaxGrid; i++)
 			{
 			   ThisVol = CalNextVol(ThisVol);
-			   ret = OrderSend(Symbol(), OP_SELLLIMIT , ThisVol, Bid+i*GridSize*Point, 1, 0, 0, NULL, MagicNum, 0);
+			   ThisPos = CalNextPos(ThisPos, i);
+			   ret = OrderSend(Symbol(), OP_SELLLIMIT , ThisVol, Bid+ThisPos, 1, 0, 0, NULL, MagicNum, 0);
 			}
 			times--;
 		}
