@@ -31,6 +31,7 @@ extern int       MaxTotalVol = 0;
 extern int       MaxGrid = 10;
 extern int       GridSize = 50;
 extern int       GridProfit = 200;
+extern double       GridFactor = 1.5;
 
 extern int times = 9999;
 extern bool	_EnableAutoBuy	= true;
@@ -98,12 +99,23 @@ double MaxVol() {
 double CalNextPos(double v, int i)
 {
    // 50,60,70...
-   return NormalizeDouble(v+GridSize+10*(i-1)*Point, Digits);
+   //return v+GridSize+10*(i-1);
+   /**
+   if(i>5)
+   {
+      return v+2*GridSize;
+   }
+   if(i>10)
+   {
+      return v+3*GridSize;
+   }**/
+   return v+GridSize;
 }
 
 double CalNextVol(double v)
 {
-   return NormalizeDouble(1.2*v, 3);
+   //return NormalizeDouble(GridFactor*v, 3);
+   return GridFactor*v;
 }
 
 void ManageBuy()
@@ -158,7 +170,7 @@ void ManageBuy()
 			   ThisPos = CalNextPos(ThisPos, i);
 			   ThisVol = CalNextVol(ThisVol);
 
-			   ret = OrderSend(Symbol(), OP_BUYLIMIT , ThisVol, Ask-ThisPos, 1, 0, 0, NULL, MagicNum, 0);
+			   ret = OrderSend(Symbol(), OP_BUYLIMIT , NormalizeDouble(ThisVol, 3), Ask-NormalizeDouble(ThisPos*Point, Digits), 1, 0, 0, NULL, MagicNum, 0);
 			}
 			times--;
 		}
@@ -233,7 +245,7 @@ void ManageSell()
 			{
 			   ThisVol = CalNextVol(ThisVol);
 			   ThisPos = CalNextPos(ThisPos, i);
-			   ret = OrderSend(Symbol(), OP_SELLLIMIT , ThisVol, Bid+ThisPos, 1, 0, 0, NULL, MagicNum, 0);
+			   ret = OrderSend(Symbol(), OP_SELLLIMIT , NormalizeDouble(ThisVol, 3), Bid+NormalizeDouble(ThisPos*Point, Digits), 1, 0, 0, NULL, MagicNum, 0);
 			}
 			times--;
 		}
