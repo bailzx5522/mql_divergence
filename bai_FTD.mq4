@@ -100,15 +100,14 @@ double CalNextPos(double v, int i)
 {
    // 50,60,70...
    //return v+GridSize+10*(i-1);
-   /**
-   if(i>5)
+   if(i>5 && i<11)
    {
-      return v+2*GridSize;
+      return v+1.5*GridSize;
    }
    if(i>10)
    {
-      return v+3*GridSize;
-   }**/
+      return v+2*GridSize;
+   }
    return v+GridSize;
 }
 
@@ -287,4 +286,11 @@ int MakeDecision()
 void Display()
 {
    Comment("");
+}
+
+void MM()
+{
+   
+   AccountBalance();
+   AccountEquity();
 }
