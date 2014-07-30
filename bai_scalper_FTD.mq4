@@ -8,6 +8,11 @@
 #property version   "1.00"
 #property strict
 
+#define BUY_OPEN 1
+#define SELL_OPEN 2
+#define BUY_CLOSE 3
+#define SELL_CLOSE 4
+#define FREE 0
 //+------------------------------------------------------------------+
 //| Input parameters                                                 |
 //+------------------------------------------------------------------+
@@ -114,6 +119,12 @@ void MakeMoney()
          }
       }
       // Get ready to open orders.
+      if(MakeDecision() == BUY_OPEN)
+      {
+         OrderSend();
+      }else if(MakeDecision() == SELL_OPEN){
+         OrderSend();
+      }
       
       
    }else if(TotalVol > 0){
@@ -126,4 +137,20 @@ void MakeMoney()
 void Display(string t)
 {
    Comment(t);
+}
+
+int MakeDecision()
+{
+   double sar = iSAR(Symbol(), PERIOD_M1, 0.02, 0.2, 0);
+   double ma = iMA(Symbol(), PERIOD_M1, 14, 0, MODE_SMA, PRICE_CLOSE, 0);
+   double bb_upper = iBands(Symbol(), PERIOD_M1, 20, 2, 0, PRICE_HIGH, MODE_UPPER,  0);
+   double bb_lower = iBands(Symbol(), PERIOD_M1, 20, 2, 0, PRICE_LOW, MODE_LOWER,  0);  
+   
+   if(Ask>sar && Ask<ma && Ask<bb_lower)
+   {
+      return BUY_OPEN;
+   }else if(Bid < sar && Bid > ma && Bid > bb_upper){
+      return SELL_OPEN;
+   }
+   return FREE;
 }
