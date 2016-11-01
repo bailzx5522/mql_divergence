@@ -2,7 +2,7 @@
 //|                                          BK's Grid EA Hybrid.mq4 |
 //|                  Backtestable version by McDonalds November 2011 |
 //+------------------------------------------------------------------+
-string	version	= "Hybrid v2009.09.11";
+string	version	= "Hybrid v2009.09.11"; 
 
 extern	string	EA_Name	= "BK\'s Grid EA";
 
